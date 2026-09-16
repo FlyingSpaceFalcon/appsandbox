@@ -39,6 +39,24 @@ if [ -f /Library/AppSandbox/com.appsandbox.clipboard.plist ]; then
     chmod 755        /Library/AppSandbox/appsandbox-clipboard 2>/dev/null || true
 fi
 
+if [ -d /Library/AppSandbox/AppSandboxAccessibility.app ] &&
+   [ -f /Library/AppSandbox/com.appsandbox.accessibility.plist ]; then
+    AX_APP=/Library/AppSandbox/AppSandboxAccessibility.app
+    AX_SRC=/Library/AppSandbox/com.appsandbox.accessibility.plist
+    AX_DST=/Library/LaunchAgents/com.appsandbox.accessibility.plist
+    mkdir -p /Library/LaunchAgents
+    chown -R root:wheel "$AX_APP"
+    chmod -R u=rwX,go=rX "$AX_APP"
+    chmod 755 "$AX_APP/Contents/MacOS/AppSandboxAccessibility"
+    cp "$AX_SRC" "$AX_DST"
+    chown root:wheel "$AX_DST"
+    chmod 644 "$AX_DST"
+    AX_UID=$(/usr/bin/stat -f %u /dev/console 2>/dev/null || true)
+    if [ -n "$AX_UID" ] && [ "$AX_UID" -ne 0 ]; then
+        /bin/launchctl bootstrap "gui/$AX_UID" "$AX_DST" >> "$LOG" 2>&1 || true
+    fi
+fi
+
 # SSH: primary enablement is the launchd override DB flip the host does
 # during stage. As belt-and-braces, also run the in-guest enable path,
 # which works without Full Disk Access (unlike systemsetup -setremotelogin).

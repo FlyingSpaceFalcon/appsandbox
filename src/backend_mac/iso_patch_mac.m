@@ -684,6 +684,24 @@ static BOOL write_prov_scripts(NSString *dir, NSString *sshMsiName) {
         [m appendFormat:@"%@\tLibrary/AppSandbox/com.appsandbox.clipboard.plist\t0644\troot:wheel\n",
             clipPlist];
     }
+    NSString *axApp = [dir stringByAppendingPathComponent:@"AppSandboxAccessibility.app"];
+    NSString *axPlist = [dir stringByAppendingPathComponent:@"com.appsandbox.accessibility.plist"];
+    if ([fm fileExistsAtPath:axApp] && [fm fileExistsAtPath:axPlist]) {
+        NSCharacterSet *invalidPathCharacters = [NSCharacterSet characterSetWithCharactersInString:@"\t\r\n"];
+        NSDirectoryEnumerator *files = [fm enumeratorAtPath:axApp];
+        for (NSString *relativePath in files) {
+            NSString *src = [axApp stringByAppendingPathComponent:relativePath];
+            NSDictionary *attributes = [fm attributesOfItemAtPath:src error:nil];
+            if (![attributes[NSFileType] isEqualToString:NSFileTypeRegular]) continue;
+            if ([src rangeOfCharacterFromSet:invalidPathCharacters].location != NSNotFound ||
+                relativePath.isAbsolutePath || [relativePath.pathComponents containsObject:@".."]) continue;
+            unsigned int mode = [attributes[NSFilePosixPermissions] unsignedIntValue] & 0111 ? 0755 : 0644;
+            [m appendFormat:@"%@\tLibrary/AppSandbox/AppSandboxAccessibility.app/%@\t%04o\troot:wheel\n",
+                src, relativePath, mode];
+        }
+        [m appendFormat:@"%@\tLibrary/AppSandbox/com.appsandbox.accessibility.plist\t0644\troot:wheel\n",
+            axPlist];
+    }
     return m;
 }
 

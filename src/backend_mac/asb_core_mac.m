@@ -1502,7 +1502,7 @@ int asb_mac_open_display(const char *name) {
         AsbIvshmemTransport *t = g_transport_refs[idx];
         if (!t)                          return BACKEND_ERR_NOT_RUNNING;
         if (g_display_refs[idx]) {   /* already open -> focus */
-            [[(IddDisplayWindow *)g_display_refs[idx] window] makeKeyAndOrderFront:nil];
+            [(IddDisplayWindow *)g_display_refs[idx] showDisplay];
             return BACKEND_OK;
         }
         NSString *nsName = [NSString stringWithUTF8String:name];
@@ -1516,7 +1516,7 @@ int asb_mac_open_display(const char *name) {
     if (!g_vms[idx].running || !g_vms[idx].vz_handle) return BACKEND_ERR_NOT_RUNNING;
     if (!g_vms[idx].agent_online)                     return BACKEND_ERR_NOT_READY;
     if (g_display_refs[idx]) {   /* already open -> focus */
-        [[(VzDisplayWindow *)g_display_refs[idx] window] makeKeyAndOrderFront:nil];
+        [(VzDisplayWindow *)g_display_refs[idx] showDisplay];
         return BACKEND_OK;
     }
     VzDisplayWindow *display = [[VzDisplayWindow alloc] initWithVzVm:g_vms[idx].vz_handle];
@@ -1530,11 +1530,13 @@ void asb_mac_close_display(const char *name) {
     if (!name) return;
     int idx = vm_index_of(name);
     if (idx < 0 || !g_display_refs[idx]) return;
-    VzDisplayWindow *display = g_display_refs[idx];   /* local strong ref keeps it
-                                                         alive across the close */
+    VzDisplayWindow *display = g_display_refs[idx];
+    /* Keep the controller retained until its window delegate finishes closing
+       the accessibility, audio, and clipboard connections. ARC can release a
+       local reference after fetching display.window, before sending close. */
+    [display.window close];
     g_display_refs[idx] = nil;
     g_vms[idx].display  = nil;
-    [display.window close];                           /* fires windowWillClose: */
 }
 
 int asb_mac_vm_stop(const char *name, int force) {

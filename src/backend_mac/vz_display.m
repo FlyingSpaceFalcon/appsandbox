@@ -1,10 +1,11 @@
 #import "vz_display.h"
 #import "vz_vm.h"
 #import "asb_core_mac.h"
+#import "vz_accessibility_view.h"
 
 @interface VzDisplayWindow () <NSWindowDelegate>
 @property (nonatomic, strong) VzVm *vm;
-@property (nonatomic, strong) VZVirtualMachineView *vmView;
+@property (nonatomic, strong) VzAccessibilityView *vmView;
 @end
 
 @implementation VzDisplayWindow
@@ -24,11 +25,17 @@
     if (!self) return nil;
 
     _vm = vm;
-    _vmView = [[VZVirtualMachineView alloc] initWithFrame:frame];
+    _vmView = [[VzAccessibilityView alloc] initWithFrame:frame];
     _vmView.virtualMachine = vm.machine;
     _vmView.capturesSystemKeys = YES;
     _vmView.automaticallyReconfiguresDisplay = YES;
     _vmView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    for (VZSocketDevice *device in vm.machine.socketDevices) {
+        if ([device isKindOfClass:VZVirtioSocketDevice.class]) {
+            [_vmView configureWithSocketDevice:(VZVirtioSocketDevice *)device vmName:vm.name];
+            break;
+        }
+    }
     window.contentView = _vmView;
     window.delegate = self;
     return self;
@@ -36,6 +43,7 @@
 
 - (void)showDisplay {
     [self showWindow:nil];
+    [self.vmView startAccessibility];
     /* Bring the window to the front. The headless daemon is an Accessory app, so
        its window would otherwise open behind the active app; activating brings it
        forward and gives it key focus. Harmless in the GUI (already the active app). */
@@ -51,17 +59,20 @@
 #pragma mark - NSWindowDelegate
 
 - (void)windowWillClose:(NSNotification *)notification {
+    [self.vmView stopAccessibility];
     self.userClosed = YES;   /* mark closed (X button or programmatic) before teardown */
     asb_mac_vm_set_audio_muted(self.vm.name.UTF8String, YES);
     asb_mac_vm_set_clipboard_sync(self.vm.name.UTF8String, NO);
 }
 
 - (void)windowDidMiniaturize:(NSNotification *)notification {
+    [self.vmView stopAccessibility];
     asb_mac_vm_set_audio_muted(self.vm.name.UTF8String, YES);
     asb_mac_vm_set_clipboard_sync(self.vm.name.UTF8String, NO);
 }
 
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
+    [self.vmView startAccessibility];
     asb_mac_vm_set_audio_muted(self.vm.name.UTF8String, NO);
     asb_mac_vm_set_clipboard_sync(self.vm.name.UTF8String, YES);
 }
@@ -71,6 +82,7 @@
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
+    [self.vmView resetKeyboardModifiers];
     asb_mac_vm_set_clipboard_sync(self.vm.name.UTF8String, NO);
 }
 

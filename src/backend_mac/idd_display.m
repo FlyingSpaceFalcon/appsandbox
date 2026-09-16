@@ -17,6 +17,8 @@
  */
 
 #import "idd_display.h"
+#import "keyboard_modifiers_mac.h"
+#import "vm_accessibility_mac.h"
 #import "asb_ivshmem_transport.h"
 #import "vm_dir.h"
 #import <AudioToolbox/AudioToolbox.h>
@@ -380,6 +382,7 @@ static __weak IddDisplayWindow *g_hotkeyOwner;
 static __weak IddDisplayWindow *g_mouseOwner;
 
 @interface IddDisplayView : NSView
+@property(nonatomic, strong) VmAccessibilityMac *accessibilityBridge;
 @property (nonatomic, weak) IddDisplayWindow *owner;
 @property (nonatomic, strong) NSTrackingArea *track;
 - (void)updateGuestCursor;   /* mirror the guest HW cursor onto this view's NSCursor (render timer) */
@@ -493,6 +496,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
     NSUInteger        _trackingMenus;
     BOOL              _heldKeys[128];
     InputPacket       _heldPackets[128];
+    NSEventModifierFlags _keyboardModifierFlags;
 
     /* Published reader fds shared with teardown. */
     pthread_mutex_t   _inputLock;
@@ -585,6 +589,8 @@ static __weak IddDisplayWindow *g_mouseOwner;
     _view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     window.contentView = _view;
     window.delegate = self;
+    _view.accessibilityBridge = [[VmAccessibilityMac alloc] initWithView:_view vmName:name];
+    [_view.accessibilityBridge configureWithTransport:transport];
     [self loadDisplaySettings];
     [self setupMetal];
     return self;
@@ -745,6 +751,14 @@ static __weak IddDisplayWindow *g_mouseOwner;
     if (kc >= 128) return;
     pthread_mutex_lock(&_inqLock);
     if (!_inputReady || _stop) { pthread_mutex_unlock(&_inqLock); return; }
+    if (event.type == NSEventTypeFlagsChanged) {
+        NSArray<NSEvent *> *transitions = AsbKeyboardModifierEvents(event, &_keyboardModifierFlags);
+        if (kc == 0) {
+            pthread_mutex_unlock(&_inqLock);
+            for (NSEvent *transition in transitions) [self forwardKeyEvent:transition];
+            return;
+        }
+    }
     uint32_t vk = 0;
     uint32_t scan = 0;
     BOOL up = event.type == NSEventTypeKeyUp;
@@ -984,6 +998,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
 
 - (void)releaseHeldKeys {
     pthread_mutex_lock(&_inqLock);
+    _keyboardModifierFlags = 0;
     for (unsigned int kc = 0; kc < 128; kc++) {
         if (!_heldKeys[kc]) continue;
         InputPacket packet = _heldPackets[kc];
@@ -1100,6 +1115,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
         pthread_create(&_clipReaderThread, NULL, idd_clip_reader_thread, (__bridge void *)self);
     }
     [self updateKeyboardCapture];
+    [self.view.accessibilityBridge startAccessibility];
 }
 
 /* Render-timer body (main thread): flush a coalesced move, mirror the guest HW cursor onto the
@@ -1109,6 +1125,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
     [self flushMove];
     [self.view updateGuestCursor];
     [self renderMetal];
+    [self.view.accessibilityBridge updateDisplayPixels:_frontValid ? NSMakeSize(_surfW, _surfH) : NSZeroSize];
 }
 
 #pragma mark - GPU render (Metal, main thread)
@@ -1443,6 +1460,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
         pthread_mutex_lock(&_inqLock);
         _inqHead = _inqTail = 0;
         memset(_heldKeys, 0, sizeof(_heldKeys));
+        _keyboardModifierFlags = 0;
         _keyboardVersion = keyboardVersion;
         _mouseVersion = mouseVersion;
         uint64_t connection = ++_inputConnection;
@@ -1549,6 +1567,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
         _mouseVersion = 0;
         _inqHead = _inqTail = 0;
         memset(_heldKeys, 0, sizeof(_heldKeys));
+        _keyboardModifierFlags = 0;
         pthread_mutex_unlock(&_inqLock);
         dispatch_async(dispatch_get_main_queue(), ^{
             IddDisplayWindow *owner = weakSelf;
@@ -2003,6 +2022,7 @@ static __weak IddDisplayWindow *g_mouseOwner;
 #pragma mark - Teardown
 
 - (void)teardown {
+    [self.view.accessibilityBridge stopAccessibility];
     if (_stop) return;
     [self releaseMouseCapture];
     [self releaseKeyboardCapture];
@@ -2206,6 +2226,16 @@ static CGRect idd_letterbox(double viewW, double viewH, double frameW, double fr
  * ================================================================================ */
 @implementation IddDisplayView
 
+- (BOOL)isAccessibilityElement { return self.accessibilityBridge.hasAccessibilityContent ? YES : [super isAccessibilityElement]; }
+- (NSString *)accessibilityRole { return self.accessibilityBridge.hasAccessibilityContent ? NSAccessibilityGroupRole : [super accessibilityRole]; }
+- (NSString *)accessibilityLabel { return self.accessibilityBridge.hasAccessibilityContent ? self.accessibilityBridge.accessibilityLabel : [super accessibilityLabel]; }
+- (NSArray *)accessibilityChildren { return self.accessibilityBridge.hasAccessibilityContent ? self.accessibilityBridge.accessibilityChildren : [super accessibilityChildren]; }
+- (NSArray *)accessibilityVisibleChildren { return self.accessibilityBridge.hasAccessibilityContent ? self.accessibilityBridge.accessibilityChildren : [super accessibilityVisibleChildren]; }
+- (id)accessibilityFocusedUIElement { return [self.accessibilityBridge accessibilityFocusedUIElement] ?: [super accessibilityFocusedUIElement]; }
+- (id)accessibilityHitTest:(NSPoint)point { return [self.accessibilityBridge accessibilityHitTest:point] ?: [super accessibilityHitTest:point]; }
+- (void)viewDidMoveToWindow { [super viewDidMoveToWindow]; [self.accessibilityBridge observeWindow]; }
+- (void)setBoundsSize:(NSSize)size { [super setBoundsSize:size]; [self.accessibilityBridge geometryDidChange]; }
+
 - (BOOL)isOpaque { return YES; }
 - (BOOL)acceptsFirstResponder { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent *)e { (void)e; return YES; }
@@ -2241,6 +2271,7 @@ static CGRect idd_letterbox(double viewW, double viewH, double frameW, double fr
 - (void)setFrameSize:(NSSize)newSize
 {
     [super setFrameSize:newSize];
+    [self.accessibilityBridge geometryDidChange];
     [self.owner renderMetal];
 }
 - (void)viewDidEndLiveResize

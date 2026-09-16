@@ -1684,7 +1684,7 @@ static int cmd_build_windows(int argc, char **argv) {
      * appsandbox-displays.exe is staged when present in the payload). */
     const char *bins[] = { "appsandbox-agent.exe", "appsandbox-input.exe", "appsandbox-displays.exe",
                            "appsandbox-clipboard.exe", "appsandbox-clipboard-reader.exe",
-                           "appsandbox-audio.exe" };
+                           "appsandbox-audio.exe", "appsandbox-accessibility.exe" };
     for (size_t i = 0; i < sizeof(bins)/sizeof(bins[0]); i++) {
         NSString *src = [binDir stringByAppendingPathComponent:@(bins[i])];
         n += bw_manifest_add(mf, src, [NSString stringWithFormat:@"\\Windows\\AppSandbox\\%s", bins[i]].UTF8String);

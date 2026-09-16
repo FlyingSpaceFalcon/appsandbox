@@ -58,6 +58,10 @@
 #define ASB_P9_RING_CAP         0x20000u              /* 128 KiB per ring (>= 9P msize 64 KiB) */
 #define ASB_P9_N_SLOTS          2u
 
+#define ASB_AX_REGION_OFF       (ASB_P9_REGION_OFF + ASB_P9_REGION_SIZE)
+#define ASB_AX_REGION_SIZE      0x400000ull
+#define ASB_AX_RING_CAP         0x100000u
+
 /* Stream slot strides: [hdr][g2h hdr+cap][h2g hdr+cap]. Display is asymmetric (big g2h, tiny h2g). */
 #define ASB_DISPLAY_SLOT_STRIDE (ASB_SLOT_HDR + (ASB_RING_HDR + ASB_DISPLAY_RING_CAP) + (ASB_RING_HDR + ASB_DISPLAY_H2G_CAP))
 #define ASB_INPUT_SLOT_STRIDE   (ASB_SLOT_HDR + 2u * (ASB_RING_HDR + ASB_INPUT_RING_CAP))
@@ -66,6 +70,7 @@
 #define ASB_AGENT_SLOT_STRIDE   (ASB_SLOT_HDR + 2u * (ASB_RING_HDR + ASB_AGENT_RING_CAP))
 #define ASB_SSH_SLOT_STRIDE     (ASB_SLOT_HDR + 2u * (ASB_RING_HDR + ASB_SSH_RING_CAP))
 #define ASB_P9_SLOT_STRIDE      (ASB_SLOT_HDR + 2u * (ASB_RING_HDR + ASB_P9_RING_CAP))
+#define ASB_AX_SLOT_STRIDE      (ASB_SLOT_HDR + 2u * (ASB_RING_HDR + ASB_AX_RING_CAP))
 
 /* Each region must hold all its slots: n_slots * slot_stride <= region_size. These compile-time
  * checks fail the build (negative array dimension) if a region is too small to contain its slot(s),
@@ -80,8 +85,10 @@ typedef char asb_fits_clipr  [(ASB_CLIP_SLOT_STRIDE    <= ASB_CLIPR_REGION_SIZE)
 typedef char asb_fits_agent  [(ASB_AGENT_SLOT_STRIDE   <= ASB_AGENT_REGION_SIZE) ? 1 : -1];
 typedef char asb_fits_ssh    [((uint64_t)ASB_SSH_N_SLOTS * ASB_SSH_SLOT_STRIDE <= ASB_SSH_REGION_SIZE) ? 1 : -1];
 typedef char asb_fits_p9     [((uint64_t)ASB_P9_N_SLOTS  * ASB_P9_SLOT_STRIDE  <= ASB_P9_REGION_SIZE)  ? 1 : -1];
+typedef char asb_fits_ax     [(ASB_AX_SLOT_STRIDE <= ASB_AX_REGION_SIZE) ? 1 : -1];
+typedef char asb_ax_in_bar   [(ASB_AX_REGION_OFF + ASB_AX_REGION_SIZE <= 128ull * 1024 * 1024) ? 1 : -1];
 
-#define ASB_SHM_N_REGIONS       8
+#define ASB_SHM_N_REGIONS       9
 
 /* Initialize one region's slots in place: zero each slot, set both rings' caps, mark FREE.
  * For an asymmetric region pass distinct g2h/h2g caps (display); otherwise they're equal. */
@@ -129,6 +136,7 @@ static inline void asb_shm_publish(uint8_t *bar, uint64_t bar_size)
     asb_shm_set_region(dir, 5, ASB_CH_AGENT,            ASB_AGENT_REGION_OFF, ASB_AGENT_REGION_SIZE, 1, ASB_AGENT_SLOT_STRIDE);
     asb_shm_set_region(dir, 6, ASB_CH_SSH,              ASB_SSH_REGION_OFF,   ASB_SSH_REGION_SIZE,   ASB_SSH_N_SLOTS, ASB_SSH_SLOT_STRIDE);
     asb_shm_set_region(dir, 7, ASB_CH_9P,               ASB_P9_REGION_OFF,    ASB_P9_REGION_SIZE,    ASB_P9_N_SLOTS,  ASB_P9_SLOT_STRIDE);
+    asb_shm_set_region(dir, 8, ASB_CH_ACCESSIBILITY,    ASB_AX_REGION_OFF,    ASB_AX_REGION_SIZE,    1, ASB_AX_SLOT_STRIDE);
 
     asb_shm_init_slots(bar, ASB_FRAME_REGION_OFF, 1, ASB_DISPLAY_SLOT_STRIDE, ASB_DISPLAY_RING_CAP, ASB_DISPLAY_H2G_CAP);
     asb_shm_init_slots(bar, ASB_INPUT_REGION_OFF, 1, ASB_INPUT_SLOT_STRIDE, ASB_INPUT_RING_CAP, ASB_INPUT_RING_CAP);
@@ -138,6 +146,7 @@ static inline void asb_shm_publish(uint8_t *bar, uint64_t bar_size)
     asb_shm_init_slots(bar, ASB_AGENT_REGION_OFF, 1, ASB_AGENT_SLOT_STRIDE, ASB_AGENT_RING_CAP, ASB_AGENT_RING_CAP);
     asb_shm_init_slots(bar, ASB_SSH_REGION_OFF, ASB_SSH_N_SLOTS, ASB_SSH_SLOT_STRIDE, ASB_SSH_RING_CAP, ASB_SSH_RING_CAP);
     asb_shm_init_slots(bar, ASB_P9_REGION_OFF, ASB_P9_N_SLOTS, ASB_P9_SLOT_STRIDE, ASB_P9_RING_CAP, ASB_P9_RING_CAP);
+    asb_shm_init_slots(bar, ASB_AX_REGION_OFF, 1, ASB_AX_SLOT_STRIDE, ASB_AX_RING_CAP, ASB_AX_RING_CAP);
 
     __sync_synchronize();
     dir->magic = ASB_SHM_DIR_MAGIC;

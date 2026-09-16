@@ -466,14 +466,14 @@ int asb_recv(AsbConn *c, void *buf, int len) {
 int asb_poll(AsbConn *c, int timeout_ms) {
     if (!c) return -1;
     if (c->is_ivshmem) {
-        int elapsed = 0;
+        ULONGLONG started = GetTickCount64();
         for (;;) {
             MemoryBarrier();
             if (c->h2g->tail != c->h2g->head) return 1;       /* inbound bytes available */
             if (*c->state != ASB_SLOT_ESTABLISHED ||
                 (c->my_host_token != 0 && *c->host_token != c->my_host_token)) return -1; /* closed/re-armed (C4) */
-            if (timeout_ms >= 0 && elapsed >= timeout_ms) return 0;
-            Sleep(1); elapsed++;
+            if (timeout_ms >= 0 && GetTickCount64() - started >= (ULONGLONG)timeout_ms) return 0;
+            Sleep(1);
         }
     }
     {   /* PC: select on the socket */

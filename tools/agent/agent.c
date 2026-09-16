@@ -77,6 +77,7 @@ static HANDLE                g_stop_event;
 static AsbConn *             g_client_sock = NULL; /* Active persistent connection */
 static volatile BOOL         g_os_shutting_down = FALSE;
 static CRITICAL_SECTION      g_send_cs;     /* Protects send_line from concurrent callers */
+static HANDLE                g_accessibility_thread;
 
 /* ---- Logging ---- */
 
@@ -2525,6 +2526,82 @@ static DWORD WINAPI service_ctrl_ex(DWORD ctrl, DWORD event_type, LPVOID event_d
     return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
+static HANDLE spawn_accessibility_in_session(DWORD session_id, HANDLE job)
+{
+    wchar_t exe_path[MAX_PATH];
+    wchar_t *slash;
+    HANDLE token = NULL;
+    LPVOID env = NULL;
+    STARTUPINFOW si = {0};
+    PROCESS_INFORMATION pi = {0};
+    DWORD length = GetModuleFileNameW(NULL, exe_path, MAX_PATH);
+    if (!length || length >= MAX_PATH) return NULL;
+    slash = wcsrchr(exe_path, L'\\');
+    if (!slash) return NULL;
+    slash[1] = L'\0';
+    if (wcscat_s(exe_path, MAX_PATH, L"appsandbox-accessibility.exe") != 0 ||
+        GetFileAttributesW(exe_path) == INVALID_FILE_ATTRIBUTES) return NULL;
+    if (!WTSQueryUserToken(session_id, &token)) return NULL;
+    if (!CreateEnvironmentBlock(&env, token, FALSE)) {
+        CloseHandle(token);
+        return NULL;
+    }
+    si.cb = sizeof(si);
+    si.lpDesktop = L"WinSta0\\Default";
+    if (!CreateProcessAsUserW(token, exe_path, NULL, NULL, NULL, FALSE,
+                             CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,
+                             env, NULL, &si, &pi)) {
+        DestroyEnvironmentBlock(env);
+        CloseHandle(token);
+        return NULL;
+    }
+    DestroyEnvironmentBlock(env);
+    CloseHandle(token);
+    if (!AssignProcessToJobObject(job, pi.hProcess) || ResumeThread(pi.hThread) == (DWORD)-1) {
+        TerminateProcess(pi.hProcess, 1);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        return NULL;
+    }
+    CloseHandle(pi.hThread);
+    agent_log("Accessibility helper: spawned PID %lu in session %lu (as user).", pi.dwProcessId, session_id);
+    return pi.hProcess;
+}
+
+static DWORD WINAPI accessibility_monitor_thread(LPVOID context)
+{
+    HANDLE process = NULL;
+    HANDLE job = CreateJobObjectW(NULL, NULL);
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
+    DWORD current_session = 0xFFFFFFFF;
+    (void)context;
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!job) return 1;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))) {
+        CloseHandle(job);
+        return 1;
+    }
+    while (WaitForSingleObject(g_stop_event, 1000) == WAIT_TIMEOUT) {
+        DWORD session_id = WTSGetActiveConsoleSessionId();
+        if (process && (session_id != current_session || WaitForSingleObject(process, 0) != WAIT_TIMEOUT)) {
+            TerminateProcess(process, 0);
+            WaitForSingleObject(process, 2000);
+            CloseHandle(process);
+            process = NULL;
+        }
+        if (!process && session_id != 0xFFFFFFFF) {
+            process = spawn_accessibility_in_session(session_id, job);
+            if (process) current_session = session_id;
+        }
+    }
+    CloseHandle(job);
+    if (process) {
+        WaitForSingleObject(process, 2000);
+        CloseHandle(process);
+    }
+    return 0;
+}
+
 static void WINAPI service_main(DWORD argc, LPSTR *argv)
 {
     HANDLE thread;
@@ -2563,6 +2640,8 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     /* Start audio capture monitor (SYSTEM, :0004) */
     start_audio_monitor();
 
+    g_accessibility_thread = CreateThread(NULL, 0, accessibility_monitor_thread, NULL, 0, NULL);
+
     set_service_status(SERVICE_RUNNING, 0);
     agent_log("Service started.");
 
@@ -2580,6 +2659,11 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
     agent_log("Stopping SSH proxy...");
     stop_ssh_proxy();
     agent_log("SSH proxy stopped.");
+    if (g_accessibility_thread) {
+        WaitForSingleObject(g_accessibility_thread, INFINITE);
+        CloseHandle(g_accessibility_thread);
+        g_accessibility_thread = NULL;
+    }
     agent_log("Stopping audio monitor...");
     stop_audio_monitor();
     agent_log("Audio monitor stopped.");
