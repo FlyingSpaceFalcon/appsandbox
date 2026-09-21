@@ -31,7 +31,7 @@ Produces `AppSandboxSHM.sys`. (Finalize the exact project once the WDK layout is
 
 ## User-mode use (test app / agent / VDD)
 - Default BAR size **128 MiB** (power of 2; sparse backing → only touched pages cost RAM): covers 4K
-  double‑buffer + the channel rings; 64 MiB is fine for 1080p‑only. Driver picks the largest memory BAR.
+  double‑buffer + the channel rings; 64 MiB is sufficient for 2560x1440. Driver picks the largest memory BAR.
 - `SetupDiGetClassDevs(&GUID_DEVINTERFACE_ASB_IVSHMEM, ...)` → open the device path.
 - `DeviceIoControl(h, IOCTL_ASB_IVSHMEM_MAP, NULL,0, &out,sizeof(out), ...)` → `out.userVa`
   is a pointer to the shared region (`out.size` bytes). Read/write directly.

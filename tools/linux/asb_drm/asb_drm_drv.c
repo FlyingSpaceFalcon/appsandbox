@@ -42,9 +42,9 @@ static unsigned int height_param  = ASB_DEFAULT_HEIGHT;
 static unsigned int refresh_param = ASB_DEFAULT_REFRESH;
 
 module_param_named(width,   width_param,   uint, 0444);
-MODULE_PARM_DESC(width,   "Initial display width  (default 1920)");
+MODULE_PARM_DESC(width,   "Initial display width  (default 2560)");
 module_param_named(height,  height_param,  uint, 0444);
-MODULE_PARM_DESC(height,  "Initial display height (default 1080)");
+MODULE_PARM_DESC(height,  "Initial display height (default 1440)");
 module_param_named(refresh, refresh_param, uint, 0444);
 MODULE_PARM_DESC(refresh, "Refresh rate in Hz     (default 60)");
 

@@ -6,7 +6,7 @@ Module Name:
 
 Abstract:
 
-    AppSandbox Virtual Display Driver - Single 1920x1080 monitor with
+    AppSandbox Virtual Display Driver - Single 2560x1440 monitor with
     direct HvSocket frame transport to the host (no agent middleman).
 
     Single fixed-resolution monitor with framebuffer readback sent directly
@@ -38,8 +38,8 @@ Environment:
 /* ============================================================================
  *  Display constants
  * ============================================================================ */
-#define VDD_WIDTH            1920
-#define VDD_HEIGHT           1080
+#define VDD_WIDTH            2560
+#define VDD_HEIGHT           1440
 #define VDD_BPP              4          /* BGRA 8-bit */
 #define VDD_STRIDE           (VDD_WIDTH * VDD_BPP)
 #define VDD_PIXEL_BYTES      (VDD_STRIDE * VDD_HEIGHT)
@@ -91,7 +91,7 @@ struct ResolutionEntry {
 };
 
 static const ResolutionEntry g_SupportedResolutions[] = {
-    { 1920, 1080 },
+    { VDD_WIDTH, VDD_HEIGHT },
 };
 
 static const UINT g_NumResolutions = ARRAYSIZE(g_SupportedResolutions);
@@ -111,7 +111,7 @@ static const UINT g_NumRefreshRates = ARRAYSIZE(g_SupportedRefreshRates);
  *  EDID - 128-byte block
  *
  *  Manufacturer: "ASB" (AppSandBox)
- *  Descriptor:   1920x1080 @ 60 Hz, 8-bit
+ *  Descriptor:   2560x1440 @ 60 Hz, 8-bit
  *  Checksum byte 127 is a placeholder - patched at runtime.
  * ============================================================================ */
 static const BYTE VDD_EDID[] = {
@@ -131,8 +131,8 @@ static const BYTE VDD_EDID[] = {
     /* Digital input, 8-bit color depth, DisplayPort */
     0xA5,
 
-    /* 53cm x 30cm (approx 24" diagonal for 1920x1080) */
-    0x35, 0x1E,
+    /* 70cm x 39cm (approximately 32", chosen to default to 100% DPI scaling) */
+    0x46, 0x27,
 
     /* Gamma 2.2 (value = (gamma*100)-100 = 120 = 0x78) */
     0x78,
@@ -150,9 +150,9 @@ static const BYTE VDD_EDID[] = {
     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
 
-    /* Detailed Timing Descriptor #1: 1920x1080 @ 60Hz */
-    0x02, 0x3A, 0x80, 0x18, 0x71, 0x38, 0x2D, 0x40,
-    0x58, 0x2C, 0x45, 0x00, 0x12, 0x2C, 0x21, 0x00,
+    /* Detailed Timing Descriptor #1: 2560x1440 @ 60Hz (241.50 MHz) */
+    0x56, 0x5E, 0x00, 0xA0, 0xA0, 0xA0, 0x28, 0x50,
+    0x30, 0x20, 0x35, 0x00, 0x46, 0x27, 0x21, 0x00,
     0x00, 0x1E,
 
     /* Descriptor #2: Monitor name "AppSandboxVDD" */
@@ -227,7 +227,7 @@ typedef struct _VDD_DEVICE_CONTEXT {
     LUID                cachedDeviceLuid;
 
     /* Monitor mode list */
-    DISPLAYCONFIG_VIDEO_SIGNAL_INFO modes[2]; /* 1920x1080@60 (monitor + target) */
+    DISPLAYCONFIG_VIDEO_SIGNAL_INFO modes[2]; /* 2560x1440@60 (monitor + target) */
     UINT                modeCount;
 
     /* Recovery: if no AssignSwapChain arrives within 5s of Unassign,

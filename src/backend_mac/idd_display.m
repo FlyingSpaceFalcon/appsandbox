@@ -2293,8 +2293,8 @@ static CGRect idd_letterbox(double viewW, double viewH, double frameW, double fr
     if (!o) return;
     NSRect b = self.bounds;
     if (b.size.width < 1 || b.size.height < 1) return;
-    uint32_t gw = [o frameWidth]  ? [o frameWidth]  : 1920;
-    uint32_t gh = [o frameHeight] ? [o frameHeight] : 1080;
+    uint32_t gw = [o frameWidth]  ? [o frameWidth]  : 2560;
+    uint32_t gh = [o frameHeight] ? [o frameHeight] : 1440;
     /* Invert the SAME letterbox the renderer uses (mirrors window_to_vm_coords): map the click into the
        letterboxed rect, not the whole view, so the cursor lands on the correct VM pixel and a click in a
        bar clamps to the frame edge (Windows behavior). */

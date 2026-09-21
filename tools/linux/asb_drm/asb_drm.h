@@ -30,8 +30,8 @@
  * Tunables. Module params override these at load time where applicable.
  * -------------------------------------------------------------------------- */
 
-#define ASB_DEFAULT_WIDTH     1920
-#define ASB_DEFAULT_HEIGHT    1080
+#define ASB_DEFAULT_WIDTH     2560
+#define ASB_DEFAULT_HEIGHT    1440
 #define ASB_DEFAULT_REFRESH   60
 
 #define ASB_MAX_WIDTH         7680

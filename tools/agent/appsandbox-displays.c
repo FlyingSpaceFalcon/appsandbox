@@ -6,7 +6,7 @@
  *   <count>,<W>x<H>,<W>x<H>,...
  *
  * Example:
- *   2,1920x1080,1024x768
+ *   2,2560x1440,1024x768
  *
  * Must be launched in the interactive session (WinSta0\Default) so that
  * EnumDisplayDevices / EnumDisplaySettings see all displays.

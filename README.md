@@ -15,7 +15,7 @@ Windows features:
 - GPU Hardware Video Decoder/Encoder support
 - SSH via Hyper-V socket proxy (no network required)
 - Snapshots
-- Fixed 1080P60 display
+- Fixed QHD (2560x1440) 60 Hz display
 - Host to client hot-key support
 - Provision and boot with / without internet
 - Supports running Claude Cowork and Docker inside the VM thanks to Nested Virtualization Support
@@ -28,7 +28,7 @@ Mac features:
 - 2 Channel Audio
 - macOS: GPU Acceleration via Paravirtualization with support for Metal, Windows: No GPU Acceleration
 - SSH via virtio-vsock (no network required)
-- Fixed 1080P60 display on Windows 11 guests, Dynamic display sizing on macOS guests
+- Fixed QHD (2560x1440) 60 Hz display on Windows 11 guests, Dynamic display sizing on macOS guests
 - Provision and boot with / without internet
 - Headless mode: the same scriptable local HTTP/JSON API + Python SDK (`asb.py`) as on Windows, for driving macOS and Windows 11 VMs programmatically
 

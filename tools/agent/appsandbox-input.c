@@ -82,8 +82,8 @@ static void inject_input(const InputPacket *pkt)
     case INPUT_MOUSE_MOVE: {
         int screen_w = GetSystemMetrics(SM_CXSCREEN);
         int screen_h = GetSystemMetrics(SM_CYSCREEN);
-        if (screen_w <= 0) screen_w = 1920;
-        if (screen_h <= 0) screen_h = 1080;
+        if (screen_w <= 0) screen_w = 2560;
+        if (screen_h <= 0) screen_h = 1440;
         inp.type = INPUT_MOUSE;
         inp.mi.dx = (LONG)(pkt->param1 * 65535 / (UINT32)(screen_w - 1));
         inp.mi.dy = (LONG)(pkt->param2 * 65535 / (UINT32)(screen_h - 1));

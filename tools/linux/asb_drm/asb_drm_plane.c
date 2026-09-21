@@ -63,7 +63,7 @@ static const u64 asb_format_modifiers[] = {
  *
  * We use drm_atomic_helper_check_plane_state with NO scaling and CRTC-sized
  * source rect. That gives userspace clear feedback if it tries to enable a
- * mismatched mode (e.g. requesting 4K on our default 1080p configuration).
+ * mismatched mode (e.g. requesting 4K on our default QHD configuration).
  * -------------------------------------------------------------------------- */
 
 static int asb_primary_atomic_check(struct drm_plane *plane,

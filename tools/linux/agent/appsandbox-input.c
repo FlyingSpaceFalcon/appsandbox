@@ -43,8 +43,8 @@
 #define ABS_RANGE   32767
 
 static volatile sig_atomic_t g_stop = 0;
-static int g_frame_w = 1920;
-static int g_frame_h = 1080;
+static int g_frame_w = 2560;
+static int g_frame_h = 1440;
 
 static void on_signal(int sig) { (void)sig; g_stop = 1; }
 

@@ -6,7 +6,7 @@ Module Name:
 
 Abstract:
 
-    AppSandbox Virtual Display Driver - Single 1920x1080 monitor with
+    AppSandbox Virtual Display Driver - Single 2560x1440 monitor with
     direct HvSocket frame transport to the host (no agent middleman).
 
     IddCx lifecycle:
@@ -868,7 +868,7 @@ static void VddContextInit(VDD_DEVICE_CONTEXT* ctx, WDFDEVICE device)
     memset(ctx, 0, sizeof(*ctx));
     ctx->wdfDevice = device;
 
-    /* Pre-populate the single 1920x1080@60Hz mode */
+    /* Pre-populate the single 2560x1440@60Hz mode */
     VddCreateMonitorMode(&ctx->modes[0], 0);  /* vSyncDivider=0 for monitor modes */
     ctx->modeCount = 1;
 }
@@ -1280,7 +1280,7 @@ NTSTATUS VddParseMonitorDescription(
     VddCreateMonitorMode(&pMode->MonitorVideoSignalInfo, 0); /* vSyncDivider=0 for monitor modes */
 
     pOutArgs->PreferredMonitorModeIdx = 0;
-    VddLog("ParseMonitorDescription: returning 1 mode (1920x1080@60)");
+    VddLog("ParseMonitorDescription: returning 1 mode (2560x1440@60)");
     return STATUS_SUCCESS;
 }
 
